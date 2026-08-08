@@ -106,6 +106,8 @@ model Warehouse {
   isActive Boolean         @default(true) @map("is_active")
   movements StockMovement[]
   balances  StockBalance[]
+  costLayers CostLayer[]
+  serialNumbers SerialNumber[]
 
   @@map("warehouses")
 }
@@ -132,6 +134,9 @@ model Product {
   barcodes        ProductBarcode[]
   movements       StockMovement[]
   balances        StockBalance[]
+  costLayers      CostLayer[]
+  serialNumbers   SerialNumber[]
+  lots            Lot[]
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -180,6 +185,7 @@ model Partner {
   creditTermDays Int         @default(0) @map("credit_term_days")
   priceLevel     PriceLevel  @default(RETAIL) @map("price_level")
   isActive       Boolean     @default(true) @map("is_active")
+  serialsSold    SerialNumber[]
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
@@ -214,16 +220,128 @@ model StockMovement {
   refDocType   String        @map("ref_doc_type")
   refDocId     String        @map("ref_doc_id")
   note         String?
+  // สินค้า tracking_type = LOT ต้องระบุล็อตทุก movement
+  lot          Lot?          @relation(fields: [lotId], references: [id])
+  lotId        String?       @map("lot_id")
   // กลับรายการได้ครั้งเดียว (unique) และตัว REVERSAL เองห้ามถูกกลับซ้ำ
   reversalOf   StockMovement? @relation("Reversal", fields: [reversalOfId], references: [id])
   reversalOfId String?        @unique @map("reversal_of_id")
   reversedBy   StockMovement? @relation("Reversal")
+  // FIFO: movement รับเข้าสร้าง layer ได้ 1 ก้อน / movement จ่ายออกกิน layer ได้หลายก้อน
+  costLayer    CostLayer?             @relation("LayerSource")
+  consumptions CostLayerConsumption[] @relation("LayerConsumer")
+  serialsIn    SerialNumber[]         @relation("SerialReceive")
+  serialsOut   SerialNumber[]         @relation("SerialIssue")
   createdAt    DateTime      @default(now()) @map("created_at")
   createdBy    String        @map("created_by")
 
   @@index([productId, warehouseId, createdAt])
   @@index([refDocType, refDocId])
+  @@index([lotId, warehouseId])
   @@map("stock_movements")
+}
+
+// ---------- Serial tracking (แอร์ ตู้เย็น ปั๊มน้ำ — ตามตัวรายเครื่อง) ----------
+
+enum SerialStatus {
+  IN_STOCK // อยู่ในคลัง พร้อมขาย
+  SOLD // ขายออกไปแล้ว (นับประกันจากวันขาย)
+  CLAIMED // ลูกค้าส่งเคลม
+  RETURNED // รับคืนเข้าคลัง
+}
+
+model SerialNumber {
+  id                String        @id @default(uuid())
+  product           Product       @relation(fields: [productId], references: [id])
+  productId         String        @map("product_id")
+  // unique ทั้งระบบ เพื่อให้หน้าเคลม "ยิง serial ปุ๊บรู้ทันที" ไม่ต้องถามรุ่นก่อน
+  serial            String        @unique
+  warehouse         Warehouse?    @relation(fields: [warehouseId], references: [id])
+  warehouseId       String?       @map("warehouse_id")
+  status            SerialStatus  @default(IN_STOCK)
+  receiveMovement   StockMovement @relation("SerialReceive", fields: [receiveMovementId], references: [id])
+  receiveMovementId String        @map("receive_movement_id")
+  issueMovement     StockMovement? @relation("SerialIssue", fields: [issueMovementId], references: [id])
+  issueMovementId   String?       @map("issue_movement_id")
+  soldToPartner     Partner?      @relation(fields: [soldToPartnerId], references: [id])
+  soldToPartnerId   String?       @map("sold_to_partner_id")
+  soldAt            DateTime?     @map("sold_at")
+  warrantyEnd       DateTime?     @map("warranty_end")
+  note              String?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@index([productId, status])
+  @@index([warehouseId, status])
+  @@index([warrantyEnd])
+  @@map("serial_numbers")
+}
+
+// ---------- Lot tracking (ปูน สี เคมีภัณฑ์ — มีวันหมดอายุ จ่ายแบบ FEFO) ----------
+
+model Lot {
+  id         String          @id @default(uuid())
+  product    Product         @relation(fields: [productId], references: [id])
+  productId  String          @map("product_id")
+  lotNo      String          @map("lot_no")
+  expiryDate DateTime?       @map("expiry_date")
+  receivedAt DateTime        @map("received_at")
+  note       String?
+  movements  StockMovement[]
+  costLayers CostLayer[]
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  // ยอดคงเหลือราย lot ไม่เก็บ cache — คำนวณจาก SUM(movements) ตามหลัก ledger
+  @@unique([productId, lotNo])
+  @@index([productId, expiryDate])
+  @@map("lots")
+}
+
+// ---------- FIFO cost layers (ใช้เฉพาะสินค้า costing_method = FIFO) ----------
+
+model CostLayer {
+  id               String                @id @default(uuid())
+  product          Product               @relation(fields: [productId], references: [id])
+  productId        String                @map("product_id")
+  warehouse        Warehouse             @relation(fields: [warehouseId], references: [id])
+  warehouseId      String                @map("warehouse_id")
+  // null ได้เฉพาะ layer ยอดยกมา (isOpening) ที่ไม่ได้เกิดจากการรับเข้าใบใด
+  sourceMovement   StockMovement?        @relation("LayerSource", fields: [sourceMovementId], references: [id])
+  sourceMovementId String?               @unique @map("source_movement_id")
+  originalQty      Decimal               @map("original_qty") @db.Decimal(18, 3)
+  remainingQty     Decimal               @map("remaining_qty") @db.Decimal(18, 3)
+  unitCost         Decimal               @map("unit_cost") @db.Decimal(18, 4)
+  receivedAt       DateTime              @map("received_at")
+  // ยอดยกมาตอนเริ่มใช้ FIFO (สลับ method จาก AVG หรือ backfill ข้อมูลเก่า)
+  isOpening        Boolean               @default(false) @map("is_opening")
+  note             String?
+  // สินค้า LOT: ต้นทุนผูกกับล็อต — จ่ายล็อตไหนต้องกินทุนของล็อตนั้น
+  // (FEFO เลือกล็อตตามวันหมดอายุ ซึ่งอาจไม่ใช่ล็อตที่รับเข้าก่อน)
+  lot              Lot?                  @relation(fields: [lotId], references: [id])
+  lotId            String?               @map("lot_id")
+  consumptions     CostLayerConsumption[]
+
+  // จ่ายออกเรียงตาม received_at เก่าสุดก่อน — index นี้คือหัวใจความเร็วของ FIFO
+  @@index([productId, warehouseId, receivedAt])
+  @@index([lotId])
+  @@map("cost_layers")
+}
+
+// append-only เหมือน ledger: กลับรายการ = ลงแถวใหม่ qty ติดลบ ไม่ลบแถวเดิม
+// invariant: original_qty - SUM(consumptions.qty) = remaining_qty เสมอ
+model CostLayerConsumption {
+  id              String        @id @default(uuid())
+  layer           CostLayer     @relation(fields: [layerId], references: [id])
+  layerId         String        @map("layer_id")
+  issueMovement   StockMovement @relation("LayerConsumer", fields: [issueMovementId], references: [id])
+  issueMovementId String        @map("issue_movement_id")
+  qty             Decimal       @db.Decimal(18, 3)
+  unitCost        Decimal       @map("unit_cost") @db.Decimal(18, 4)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([issueMovementId])
+  @@index([layerId])
+  @@map("cost_layer_consumptions")
 }
 
 // CACHE เท่านั้น — source of truth คือ SUM(stock_movements) ตรวจด้วย /inventory/reconcile

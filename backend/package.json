@@ -12,6 +12,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "verify": "node test/verify/verify-phase0.mjs && node test/verify/verify-phase1.mjs && node test/verify/verify-phase2.mjs && node test/verify/verify-phase3.mjs && node test/verify/verify-phase3.5.mjs",
     "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts"

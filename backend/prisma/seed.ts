@@ -355,6 +355,31 @@ async function seedMasterData(): Promise<void> {
       create: pt,
     });
   }
+
+  // ล็อตตัวอย่างของสินค้า LOT (ปูน/สี) — ให้เห็นการเรียงแบบ FEFO ทันทีหลัง seed
+  const day = 86_400_000;
+  const sampleLots: { sku: string; lotNo: string; expiryInDays: number }[] = [
+    { sku: 'CEM-TPI-M199', lotNo: 'TPI-2026-07', expiryInDays: 25 },
+    { sku: 'CEM-TPI-M199', lotNo: 'TPI-2026-08', expiryInDays: 80 },
+    { sku: 'PAINT-TOA-WH1', lotNo: 'TOA-2026-06', expiryInDays: 300 },
+  ];
+  for (const lot of sampleLots) {
+    const product = await prisma.product.findUnique({
+      where: { sku: lot.sku },
+      select: { id: true },
+    });
+    if (!product) continue;
+    await prisma.lot.upsert({
+      where: { productId_lotNo: { productId: product.id, lotNo: lot.lotNo } },
+      update: {},
+      create: {
+        productId: product.id,
+        lotNo: lot.lotNo,
+        expiryDate: new Date(Date.now() + lot.expiryInDays * day),
+        receivedAt: new Date(),
+      },
+    });
+  }
 }
 
 main()

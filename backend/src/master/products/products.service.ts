@@ -3,9 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CostingMethod, Prisma } from '@prisma/client';
 import { paginate } from '../../common/dto/pagination.dto';
 import { rethrowPrismaError } from '../../common/prisma-error';
+import { InventoryService } from '../../inventory/inventory.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   ConvertQtyDto,
@@ -25,7 +26,10 @@ const productInclude = {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   async findAll(query: QueryProductsDto) {
     const where: Prisma.ProductWhereInput = {
@@ -81,8 +85,15 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto) {
+    const before = await this.prisma.product.findUnique({
+      where: { id },
+      select: { costingMethod: true },
+    });
+    if (!before) throw new NotFoundException('ไม่พบสินค้า');
+
+    let updated;
     try {
-      return await this.prisma.product.update({
+      updated = await this.prisma.product.update({
         where: { id },
         data: dto,
         include: productInclude,
@@ -90,6 +101,16 @@ export class ProductsService {
     } catch (e) {
       rethrowPrismaError(e, 'สินค้า');
     }
+
+    // สลับมาใช้ FIFO ตอนที่ของยังอยู่ในคลัง → ต้องตั้ง layer ยอดยกมา
+    // ไม่งั้นยอดคงเหลือมีของแต่ layer ว่าง จ่ายออกไม่ได้
+    if (
+      dto.costingMethod === CostingMethod.FIFO &&
+      before.costingMethod !== CostingMethod.FIFO
+    ) {
+      await this.inventory.ensureFifoOpeningLayers(id);
+    }
+    return updated;
   }
 
   async addUnit(productId: string, dto: CreateProductUnitDto) {

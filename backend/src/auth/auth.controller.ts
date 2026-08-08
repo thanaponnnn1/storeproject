@@ -12,7 +12,9 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // login เดารหัสได้ช้า ๆ หน่อย
+  // จำกัดต่อ IP — พนักงานทั้งร้านออกเน็ตตัวเดียวกัน ตั้งแคบเกินจะล็อกทั้งร้าน
+  // เมื่อมีคนพิมพ์รหัสผิดไม่กี่ครั้ง (การล็อกรายบัญชีจะเพิ่มในเฟส 8)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @ApiOperation({ summary: 'เข้าสู่ระบบ รับ access + refresh token' })

@@ -91,39 +91,39 @@
 
 ## เฟส 2 — Inventory Ledger + ต้นทุน Average ⭐ หัวใจของระบบ
 
-- [ ] **2.1 ตาราง ledger**
+- [x] **2.1 ตาราง ledger**
   model `StockMovement` (append-only, `ref_doc_type`/`ref_doc_id` NOT NULL) + `StockBalance` (cache) + index `(product_id, warehouse_id, created_at)` — **qty เป็น `DECIMAL(18,3)` ทุกที่** (สายไฟ 12.5 เมตรต้องได้) และ movement รับ qty เป็น**หน่วยฐานเสมอ** (คนเรียกแปลงหน่วยก่อน)
   ✔ ทดสอบ: migrate ผ่าน, รับเข้า 12.5 เมตรได้, ยืนยันใน schema ว่าไม่มีทางแก้ movement ผ่าน API
 
-- [ ] **2.2 Transaction helper + lock**
+- [x] **2.2 Transaction helper + lock**
   helper รัน Prisma interactive transaction + `SELECT ... FOR UPDATE` บนแถว `StockBalance` (ใช้ `$queryRaw` เฉพาะบรรทัด lock)
   ✔ ทดสอบ: unit test — เปิด 2 transaction ซ้อน แถวถูก lock จริง (ตัวที่สองรอ)
 
-- [ ] **2.3 รับเข้า (RECEIVE) + ต้นทุน Average**
+- [x] **2.3 รับเข้า (RECEIVE) + ต้นทุน Average**
   `POST /inventory/receipts` (อ้าง ref doc เสมอ — ช่วงนี้ใช้ doc type `MANUAL` ไปก่อน) → insert movement + คำนวณ avg ใหม่ + update balance ใน tx เดียว
   ✔ ทดสอบ: รับ 10 ชิ้น@100 แล้วรับ 10 ชิ้น@200 → avg ต้อง = 150
 
-- [ ] **2.4 จ่ายออก (ISSUE) + กันติดลบ**
+- [x] **2.4 จ่ายออก (ISSUE) + กันติดลบ**
   `POST /inventory/issues` → lock → ตรวจยอด → ตัดที่ทุน avg → movement + balance
   ✔ ทดสอบ: มี 5 ชิ้น สั่งจ่าย 6 → 422 พร้อม message ยอดไม่พอ
 
-- [ ] **2.5 e2e test กันแย่งสต๊อก (สำคัญมาก)**
+- [x] **2.5 e2e test กันแย่งสต๊อก (สำคัญมาก)**
   มีของ 10 ชิ้น ยิงจ่าย 7 ชิ้น **2 request พร้อมกัน** (`Promise.all`)
   ✔ ทดสอบ: ต้องสำเร็จแค่ 1 อีกอันโดน reject — ยอดเหลือ 3 ไม่ใช่ -4
 
-- [ ] **2.6 ปรับยอด (ADJUST) + กลับรายการ (REVERSAL)**
+- [x] **2.6 ปรับยอด (ADJUST) + กลับรายการ (REVERSAL)**
   `POST /inventory/adjustments` (นับจริงต่างจากระบบ) และ `POST /inventory/movements/:id/reverse`
   ✔ ทดสอบ: reverse แล้วยอดกลับเท่าเดิม และ movement เดิม**ยังอยู่** (ไม่ถูกลบ)
 
-- [ ] **2.7 Stock card**
+- [x] **2.7 Stock card**
   `GET /inventory/stock-card?productId=&warehouseId=&from=&to=` → รายการ movement + running balance + ทุน ต่อบรรทัด
   ✔ ทดสอบ: ทำรายการ 5 ครั้ง แล้วไล่ยอดสะสมด้วยมือ ตรงกับระบบทุกบรรทัด
 
-- [ ] **2.8 Reconcile**
+- [x] **2.8 Reconcile**
   `GET /inventory/reconcile` เทียบ `StockBalance` cache กับ `SUM(movements)` — รายงานตัวที่ไม่ตรง
   ✔ ทดสอบ: แก้ balance ตรง ๆ ใน DB (จำลองข้อมูลเพี้ยน) → reconcile จับได้
 
-- [ ] **2.9 เติมยอดคงเหลือใน barcode lookup**
+- [x] **2.9 เติมยอดคงเหลือใน barcode lookup**
   endpoint 1.5 คืน `qty_on_hand` ต่อคลังด้วย (แปลงเป็นหน่วยของ barcode ที่ยิงให้ด้วย เช่น ยิง barcode มัด → เห็นทั้ง "12 มัด" และ "120 เส้น")
   ✔ ทดสอบ: ยิง barcode แล้วเห็นยอดคงเหลือถูกต้องทั้งสองหน่วย
 
@@ -133,27 +133,27 @@
 
 ## เฟส 3 — ต้นทุน FIFO
 
-- [ ] **3.1 ตาราง cost layers**
+- [x] **3.1 ตาราง cost layers**
   model `CostLayer` + `CostLayerConsumption` ตาม PLAN.md
   ✔ ทดสอบ: migrate ผ่าน
 
-- [ ] **3.2 CostingStrategy interface**
+- [x] **3.2 CostingStrategy interface**
   refactor ของเฟส 2 เป็น `AverageStrategy` + เพิ่ม `FifoStrategy` — เลือกตาม `product.costing_method`
   ✔ ทดสอบ: test เดิมของ average ต้องผ่านเหมือนเดิมทั้งหมด (ไม่ regression)
 
-- [ ] **3.3 FIFO รับเข้า**
+- [x] **3.3 FIFO รับเข้า**
   RECEIVE ของสินค้า FIFO → สร้าง layer ใหม่ (`remaining_qty = qty`)
   ✔ ทดสอบ: รับ 3 รอบ → มี 3 layers เรียงตามเวลา
 
-- [ ] **3.4 FIFO จ่ายออก**
+- [x] **3.4 FIFO จ่ายออก**
   ISSUE → กิน layer เก่าสุดก่อน อาจคร่อมหลาย layer → บันทึก consumption ทุกก้อน
   ✔ ทดสอบ: รับ 10@100, 10@120, 10@150 → จ่าย 25 → ต้นทุนต้อง = (10×100)+(10×120)+(5×150) = **2,950** และ layer 3 เหลือ 5
 
-- [ ] **3.5 FIFO reversal**
+- [x] **3.5 FIFO reversal**
   reverse การจ่าย → คืน qty กลับ layer เดิมตาม consumption
   ✔ ทดสอบ: จ่ายแล้ว reverse → layers กลับสภาพเดิมเป๊ะ
 
-- [ ] **3.6 Unit test ครอบ costing ทั้งชุด**
+- [x] **3.6 Unit test ครอบ costing ทั้งชุด**
   ทุก edge case: จ่ายพอดี layer, คร่อม layer, จ่ายหมดคลัง, รับหลัง reverse
   ✔ ทดสอบ: coverage โมดูล costing = 100%
 
@@ -163,23 +163,23 @@
 
 ## เฟส 3.5 — Serial & Lot Tracking ⭐ หัวใจของร้านเครื่องใช้ไฟฟ้า/วัสดุก่อสร้าง
 
-- [ ] **3.5.1 ตาราง serial_numbers + รับเข้าแบบระบุ serial**
+- [x] **3.5.1 ตาราง serial_numbers + รับเข้าแบบระบุ serial**
   สินค้า `tracking_type=SERIAL`: รับเข้าต้องแนบ list serial และ**จำนวน serial ต้องเท่ากับ qty เป๊ะ** → สร้าง record สถานะ IN_STOCK ผูก movement
   ✔ ทดสอบ: รับแอร์ 5 เครื่อง + serial 5 ตัว → ผ่าน, ส่ง 4 ตัว → 422, serial ซ้ำในระบบ → 409
 
-- [ ] **3.5.2 จ่ายออกแบบเลือก serial**
+- [x] **3.5.2 จ่ายออกแบบเลือก serial**
   จ่ายสินค้า SERIAL ต้องระบุว่าเครื่องไหนออก → สถานะเป็น SOLD + บันทึกลูกค้า + วันขาย + คำนวณ `warranty_end = วันขาย + warranty_months`
   ✔ ทดสอบ: จ่าย serial ที่ไม่มี/ขายไปแล้ว → 422, จ่ายสำเร็จแล้ว warranty_end ถูกต้อง
 
-- [ ] **3.5.3 หน้าเช็คประกัน/เคลม**
+- [x] **3.5.3 หน้าเช็คประกัน/เคลม**
   `GET /serials/:serial` → สินค้าอะไร ซื้อวันไหน ใครซื้อ ประกันเหลือกี่วัน + ประวัติทั้งหมด (นี่คือ endpoint ที่หน้าร้านใช้บ่อยสุดตอนลูกค้าถือของมาเคลม)
   ✔ ทดสอบ: ยิง serial เครื่องที่ขายแล้ว → เห็นข้อมูลครบใน 1 request
 
-- [ ] **3.5.4 ตาราง lots + วันหมดอายุ + FEFO**
+- [x] **3.5.4 ตาราง lots + วันหมดอายุ + FEFO**
   สินค้า `tracking_type=LOT` (ปูน/สี): รับเข้าระบุ lot_no + expiry_date, จ่ายออกต้องระบุ lot และ endpoint แนะนำ **FEFO** (lot ใกล้หมดอายุก่อน)
   ✔ ทดสอบ: มีปูน 2 lot → ระบบแนะนำ lot เก่าก่อน, ยอดคงเหลือแยกราย lot ถูกต้อง
 
-- [ ] **3.5.5 Reversal คืน serial/lot**
+- [x] **3.5.5 Reversal คืน serial/lot**
   กลับรายการจ่าย → serial กลับเป็น IN_STOCK ลบข้อมูลขาย/ประกัน, lot ได้ qty คืน
   ✔ ทดสอบ: จ่ายแล้ว reverse → สภาพกลับเหมือนก่อนจ่ายทุกตาราง
 

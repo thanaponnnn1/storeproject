@@ -12,8 +12,11 @@ import { Roles } from '../common/decorators/roles.decorator';
 import type { AccessTokenPayload } from '../auth/auth.types';
 import {
   AdjustStockDto,
+  ExpiringLotsDto,
   IssueStockDto,
+  QueryLotsDto,
   QueryMovementsDto,
+  QuerySerialsDto,
   ReceiveStockDto,
   StockCardQueryDto,
 } from './inventory.dto';
@@ -72,6 +75,56 @@ export class InventoryController {
     @Query('warehouseId') warehouseId?: string,
   ) {
     return this.service.balances(productId, warehouseId);
+  }
+
+  @Get('serials/:serial')
+  @ApiOperation({
+    summary:
+      'ยิง serial → สินค้าอะไร ซื้อวันไหน ใครซื้อ ประกันเหลือกี่วัน (หน้าเคลม)',
+  })
+  findSerial(@Param('serial') serial: string) {
+    return this.service.findSerial(serial);
+  }
+
+  @Get('serials')
+  @ApiOperation({ summary: 'รายการ serial ทั้งหมด (กรองตามสินค้า/คลัง/สถานะ)' })
+  serials(@Query() query: QuerySerialsDto) {
+    return this.service.serials(query);
+  }
+
+  @Get('lots')
+  @ApiOperation({
+    summary: 'ล็อตพร้อมยอดคงเหลือ เรียงแบบ FEFO (ใกล้หมดอายุออกก่อน)',
+  })
+  lots(@Query() query: QueryLotsDto) {
+    return this.service.lots(query);
+  }
+
+  @Get('lots/expiring')
+  @ApiOperation({ summary: 'ล็อตที่จะหมดอายุภายใน N วัน (ใช้แจ้งเตือน/จัดโปรระบาย)' })
+  expiringLots(@Query() query: ExpiringLotsDto) {
+    return this.service.expiringLots(query);
+  }
+
+  @Get('cost-layers')
+  @ApiOperation({
+    summary: 'FIFO cost layers + ประวัติการกิน layer (ตรวจต้นทุนย้อนหลัง)',
+  })
+  costLayers(
+    @Query('productId') productId: string,
+    @Query('warehouseId') warehouseId?: string,
+  ) {
+    return this.service.costLayers(productId, warehouseId);
+  }
+
+  @Post('cost-layers/backfill')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary:
+      'สร้าง layer ยอดยกมาให้สินค้า FIFO ที่ layer ไม่ครบ (ใช้ตอน migrate ข้อมูลเก่า)',
+  })
+  backfillLayers() {
+    return this.service.backfillFifoOpeningLayers();
   }
 
   @Get('reconcile')

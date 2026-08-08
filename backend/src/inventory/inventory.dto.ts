@@ -1,18 +1,36 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsDateString,
+  IsInt,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
   IsUUID,
+  Max,
   Min,
   MinLength,
 } from 'class-validator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
-export class ReceiveStockDto {
+/** ข้อมูล serial/lot ที่แนบมากับการเคลื่อนไหวสต๊อก */
+class TrackingFieldsDto {
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'serial ทุกเครื่อง (สินค้า tracking_type = SERIAL) จำนวนต้องเท่ากับ qty',
+    example: ['DK2026A00123', 'DK2026A00124'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  serials?: string[];
+}
+
+export class ReceiveStockDto extends TrackingFieldsDto {
   @ApiProperty()
   @IsUUID()
   productId!: string;
@@ -41,13 +59,27 @@ export class ReceiveStockDto {
   @MinLength(1)
   refDocId!: string;
 
+  @ApiPropertyOptional({
+    description: 'เลขล็อต (บังคับสำหรับสินค้า tracking_type = LOT เช่น ปูน สี)',
+    example: 'TPI-2026-08-A',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  lotNo?: string;
+
+  @ApiPropertyOptional({ description: 'วันหมดอายุของล็อต', example: '2027-02-01' })
+  @IsOptional()
+  @IsDateString()
+  expiryDate?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   note?: string;
 }
 
-export class IssueStockDto {
+export class IssueStockDto extends TrackingFieldsDto {
   @ApiProperty()
   @IsUUID()
   productId!: string;
@@ -71,13 +103,28 @@ export class IssueStockDto {
   @MinLength(1)
   refDocId!: string;
 
+  @ApiPropertyOptional({
+    description:
+      'ล็อตที่จะจ่าย (บังคับสำหรับสินค้า LOT) — ดูล็อตแนะนำแบบ FEFO จาก GET /inventory/lots',
+  })
+  @IsOptional()
+  @IsUUID()
+  lotId?: string;
+
+  @ApiPropertyOptional({
+    description: 'ลูกค้าที่ซื้อ — ใช้ผูกกับ serial เพื่อเช็คประกันตอนเคลม',
+  })
+  @IsOptional()
+  @IsUUID()
+  soldToPartnerId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   note?: string;
 }
 
-export class AdjustStockDto {
+export class AdjustStockDto extends TrackingFieldsDto {
   @ApiProperty()
   @IsUUID()
   productId!: string;
@@ -107,10 +154,71 @@ export class AdjustStockDto {
   @Min(0)
   unitCost?: number;
 
+  @ApiPropertyOptional({ description: 'เลขล็อตกรณีปรับเพิ่มสินค้า LOT' })
+  @IsOptional()
+  @IsString()
+  lotNo?: string;
+
+  @ApiPropertyOptional({ description: 'ล็อตที่จะปรับลด (สินค้า LOT)' })
+  @IsOptional()
+  @IsUUID()
+  lotId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  expiryDate?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class QueryLotsDto {
+  @ApiProperty()
+  @IsUUID()
+  productId!: string;
+
+  @ApiPropertyOptional({ description: 'ไม่ระบุ = รวมทุกคลัง' })
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @ApiPropertyOptional({
+    default: true,
+    description: 'แสดงเฉพาะล็อตที่ยังมีของ',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  availableOnly?: boolean;
+}
+
+export class ExpiringLotsDto {
+  @ApiPropertyOptional({ default: 30, description: 'ล็อตที่จะหมดอายุภายในกี่วัน' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days?: number;
+}
+
+export class QuerySerialsDto extends PaginationDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @ApiPropertyOptional({ enum: ['IN_STOCK', 'SOLD', 'CLAIMED', 'RETURNED'] })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }
 
 export class StockCardQueryDto {
