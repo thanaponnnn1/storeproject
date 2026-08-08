@@ -12,6 +12,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import type { AccessTokenPayload } from '../auth/auth.types';
 import {
   AdjustStockDto,
+  BalanceQueryDto,
   ExpiringLotsDto,
   IssueStockDto,
   QueryLotsDto,
@@ -69,12 +70,9 @@ export class InventoryController {
   }
 
   @Get('balances')
-  @ApiOperation({ summary: 'ยอดคงเหลือปัจจุบัน (จาก cache)' })
-  balances(
-    @Query('productId') productId?: string,
-    @Query('warehouseId') warehouseId?: string,
-  ) {
-    return this.service.balances(productId, warehouseId);
+  @ApiOperation({ summary: 'ยอดคงเหลือปัจจุบัน (ค้นหา + แบ่งหน้า)' })
+  balances(@Query() query: BalanceQueryDto) {
+    return this.service.balances(query);
   }
 
   @Get('serials/:serial')

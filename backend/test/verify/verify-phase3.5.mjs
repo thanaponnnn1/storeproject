@@ -1,4 +1,4 @@
-// ทดสอบเกณฑ์ ✔ ของเฟส 3.5 (Serial & Lot Tracking) ตาม STEPS.md
+﻿// ทดสอบเกณฑ์ ✔ ของเฟส 3.5 (Serial & Lot Tracking) ตาม STEPS.md
 const BASE = 'http://localhost:3009';
 const results = [];
 
@@ -293,7 +293,7 @@ await req(
 );
 const balBefore = (
   await req('GET', `/api/inventory/balances?productId=${ac.id}`, null, wh)
-).data[0];
+).data.data[0];
 const revRecvSold = await req(
   'POST',
   `/api/inventory/movements/${recvOk.data.id}/reverse`,

@@ -67,10 +67,23 @@ check(
 );
 
 // --- 1.3 Product ---
-const search = await req('GET', '/api/products?search=เหล็ก', null, admin);
+// ค้นด้วยรหัสสินค้าบางส่วน
+const searchSku = await req('GET', '/api/products?search=STL-RB9', null, admin);
 check(
-  '1.3 ค้นหา "เหล็ก" เจอเหล็กเส้น',
-  search.status === 200 && search.data?.data?.some((p) => p.sku === 'STL-RB9'),
+  '1.3 ค้นหาจากรหัสสินค้าเจอ',
+  searchSku.status === 200 &&
+    searchSku.data?.data?.some((p) => p.sku === 'STL-RB9'),
+);
+// ค้นด้วยชื่อภาษาไทยบางส่วน — ทุกผลลัพธ์ต้องเกี่ยวข้องจริง
+const search = await req('GET', '/api/products?search=เหล็ก&limit=100', null, admin);
+check(
+  '1.3 ค้นหาชื่อภาษาไทยบางส่วน "เหล็ก" → เจอ และทุกผลลัพธ์มีคำนี้จริง',
+  search.status === 200 &&
+    search.data?.data?.length > 0 &&
+    search.data.data.every((p) =>
+      `${p.sku} ${p.name} ${p.brand ?? ''}`.includes('เหล็ก'),
+    ),
+  `เจอ ${search.data?.data?.length} รายการ`,
 );
 const uomEA = uoms.data.find((u) => u.code === 'EA');
 const dupSku = await req(

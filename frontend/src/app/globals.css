@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'IBM Plex Sans Thai', 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+  /* กันหน้าเลื่อนแนวนอนบนมือถือ */
+  overflow-x: hidden;
+}
+
+/* ปุ่ม/ช่องกรอกต้องกดด้วยนิ้วโป้งได้ — 48px ตามคำแนะนำ accessibility */
+@utility tap-target {
+  min-height: 48px;
+}
+
+/* iOS ซูมหน้าเองถ้า font ช่องกรอกเล็กกว่า 16px */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* พิมพ์สติกเกอร์ QR: ซ่อนทุกอย่างยกเว้นตัวป้าย ไม่ให้เมนู/ปุ่มติดไปด้วย */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-tag,
+  #print-tag * {
+    visibility: visible;
+  }
+  #print-tag {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}

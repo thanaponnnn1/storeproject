@@ -14,6 +14,7 @@ import { applyMovingAverage } from './costing/costing.util';
 import { TrackingService } from './tracking/tracking.service';
 import {
   AdjustStockDto,
+  BalanceQueryDto,
   ExpiringLotsDto,
   IssueStockDto,
   QueryLotsDto,
@@ -846,24 +847,60 @@ export class InventoryService {
   }
 
   // ---------- ยอดคงเหลือ ----------
-  async balances(productId?: string, warehouseId?: string) {
-    return this.prisma.stockBalance.findMany({
-      where: {
-        ...(productId ? { productId } : {}),
-        ...(warehouseId ? { warehouseId } : {}),
-      },
-      include: {
-        product: {
-          select: {
-            sku: true,
-            name: true,
-            minStock: true,
-            costingMethod: true,
-          },
+  /**
+   * แบ่งหน้าเสมอ — ร้านที่มีสินค้าหลายพัน SKU ถ้าดึงทั้งหมดทีเดียวหน้าเว็บจะค้าง
+   */
+  async balances(query: BalanceQueryDto) {
+    const where: Prisma.StockBalanceWhereInput = {
+      ...(query.productId ? { productId: query.productId } : {}),
+      ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+      ...(query.hideZero === 'true' ? { qtyOnHand: { not: 0 } } : {}),
+      ...(query.search
+        ? {
+            product: {
+              OR: [
+                { sku: { contains: query.search, mode: 'insensitive' } },
+                { name: { contains: query.search, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const include = {
+      product: {
+        select: {
+          sku: true,
+          name: true,
+          minStock: true,
+          costingMethod: true,
+          trackingType: true,
+          baseUom: { select: { code: true, name: true } },
         },
-        warehouse: { select: { code: true, name: true } },
       },
-      orderBy: [{ productId: 'asc' }],
-    });
+      warehouse: { select: { code: true, name: true } },
+    } satisfies Prisma.StockBalanceInclude;
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.stockBalance.findMany({
+        where,
+        include,
+        orderBy: [{ product: { sku: 'asc' } }],
+        skip: query.skip,
+        take: query.limit,
+      }),
+      this.prisma.stockBalance.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      ...row,
+      // มูลค่าคงเหลือคำนวณให้เลย หน้าเว็บจะได้ไม่ต้องคูณเอง (เสี่ยงปัดเศษไม่ตรงกัน)
+      value: row.qtyOnHand.mul(row.avgCost).toDecimalPlaces(2),
+      belowMin:
+        row.product.minStock.greaterThan(0) &&
+        row.qtyOnHand.lessThan(row.product.minStock),
+    }));
+
+    return paginate(data, total, query);
   }
 }

@@ -1,4 +1,4 @@
-// ทดสอบเกณฑ์ ✔ ของเฟส 4 (Sales Flow: QT → SO → DO → INV → Payment) ตาม STEPS.md
+﻿// ทดสอบเกณฑ์ ✔ ของเฟส 4 (Sales Flow: QT → SO → DO → INV → Payment) ตาม STEPS.md
 const BASE = 'http://localhost:3009';
 const results = [];
 
@@ -346,13 +346,13 @@ const do1 = (
 ).data;
 const balBefore = (
   await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh)
-).data[0];
+).data.data[0];
 const confirm1 = await req('PATCH', `/api/deliveries/${do1.id}/confirm`, null, wh);
 check('4.4 ยืนยันใบส่งของได้ (role WAREHOUSE)', confirm1.status === 200);
 
 const balAfter = (
   await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh)
-).data[0];
+).data.data[0];
 check(
   '4.4 ยืนยันแล้วสต๊อกลด 60 เส้นจริง',
   Number(balBefore.qtyOnHand) - Number(balAfter.qtyOnHand) === 60,
@@ -411,13 +411,13 @@ const do2 = (
 await req('PATCH', `/api/deliveries/${do2.id}/confirm`, null, wh);
 const balAfterDo2 = Number(
   (await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh))
-    .data[0].qtyOnHand,
+    .data.data[0].qtyOnHand,
 );
 const cancelDo2 = await req('PATCH', `/api/deliveries/${do2.id}/cancel`, null, admin);
 check('4.6 ยกเลิกใบส่งของที่ยืนยันแล้วได้', cancelDo2.status === 200);
 const balAfterCancel = Number(
   (await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh))
-    .data[0].qtyOnHand,
+    .data.data[0].qtyOnHand,
 );
 check(
   '4.6 ยกเลิกแล้วสต๊อกกลับคืน 10 เส้น',

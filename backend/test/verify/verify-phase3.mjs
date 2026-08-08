@@ -1,4 +1,4 @@
-// ทดสอบเกณฑ์ ✔ ของเฟส 3 (FIFO) + regression เฟส 2 ตาม STEPS.md
+﻿// ทดสอบเกณฑ์ ✔ ของเฟส 3 (FIFO) + regression เฟส 2 ตาม STEPS.md
 const BASE = 'http://localhost:3009';
 const results = [];
 
@@ -335,7 +335,7 @@ await req(
 );
 const balAvg = (
   await req('GET', `/api/inventory/balances?productId=${PA}`, null, wh)
-).data[0];
+).data.data[0];
 check(
   '3.2 regression AVG: 10@100 + 10@200 → avg ยังเป็น 150',
   Number(balAvg.avgCost) === 150,

@@ -1,4 +1,4 @@
-// ทดสอบเกณฑ์ ✔ ของเฟส 6 (Hardening: audit, รายงาน, สิทธิ์, load, cron, Cloudinary)
+﻿// ทดสอบเกณฑ์ ✔ ของเฟส 6 (Hardening: audit, รายงาน, สิทธิ์, load, cron, Cloudinary)
 const BASE = 'http://localhost:3009';
 const results = [];
 
@@ -235,7 +235,7 @@ const throttled = loadResults.filter((r) => r.status === 429).length;
 const errors = loadResults.filter((r) => r.status >= 500).length;
 const loadBal = Number(
   (await req('GET', `/api/inventory/balances?productId=${loadProd.id}`, null, wh))
-    .data[0].qtyOnHand,
+    .data.data[0].qtyOnHand,
 );
 // สิ่งที่ต้องจริงเสมอ: ยอดคงเหลือ = 100 − (จำนวนที่สำเร็จ × 3) และห้ามติดลบ
 check(

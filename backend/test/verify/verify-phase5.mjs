@@ -1,4 +1,4 @@
-// ทดสอบเกณฑ์ ✔ ของเฟส 5 (Purchase Flow: PO → GR) ตาม STEPS.md
+﻿// ทดสอบเกณฑ์ ✔ ของเฟส 5 (Purchase Flow: PO → GR) ตาม STEPS.md
 const BASE = 'http://localhost:3009';
 const results = [];
 
@@ -195,7 +195,7 @@ check('5.2 ยืนยันใบรับของได้ (role WAREHOUSE)'
 
 const balSteel = (
   await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh)
-).data[0];
+).data.data[0];
 check(
   '5.2 ยืนยันแล้วสต๊อกเข้า 60 เส้น ทุนเฉลี่ย 44 (440÷10)',
   Number(balSteel.qtyOnHand) === 60 && Number(balSteel.avgCost) === 44,
@@ -269,7 +269,7 @@ const gr2 = (
 await req('PATCH', `/api/goods-receipts/${gr2.id}/confirm`, null, wh);
 const balAfterGr2 = Number(
   (await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh))
-    .data[0].qtyOnHand,
+    .data.data[0].qtyOnHand,
 );
 const cancelGr2 = await req(
   'PATCH',
@@ -280,7 +280,7 @@ const cancelGr2 = await req(
 check('5.3 ยกเลิกใบรับของที่ยืนยันแล้วได้', cancelGr2.status === 200);
 const balAfterCancel = Number(
   (await req('GET', `/api/inventory/balances?productId=${steel.id}`, null, wh))
-    .data[0].qtyOnHand,
+    .data.data[0].qtyOnHand,
 );
 check(
   '5.3 ยกเลิกแล้วสต๊อกลดกลับ 10 เส้น',

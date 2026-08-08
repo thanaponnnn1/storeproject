@@ -64,7 +64,7 @@ await req(
 );
 let bal = (
   await req('GET', `/api/inventory/balances?productId=${P}`, null, wh)
-).data[0];
+).data.data[0];
 check(
   '2.3 avg = 150 หลังรับ 10@100 + 10@200',
   Number(bal?.avgCost) === 150 && Number(bal?.qtyOnHand) === 20,
@@ -94,7 +94,7 @@ const [c1, c2] = await Promise.all([
 const okCount = [c1, c2].filter((r) => r.status === 201).length;
 const rejCount = [c1, c2].filter((r) => r.status === 422).length;
 bal = (await req('GET', `/api/inventory/balances?productId=${P}`, null, wh))
-  .data[0];
+  .data.data[0];
 check(
   '2.5 ยิงจ่าย 15 พร้อมกัน 2 request → สำเร็จ 1 โดน reject 1',
   okCount === 1 && rejCount === 1,
@@ -142,7 +142,7 @@ const revTwice = await req(
   admin,
 );
 check('2.6 กลับรายการซ้ำ → 409', revTwice.status === 409);
-bal = (await req('GET', `/api/inventory/balances?productId=${P}`, null, wh)).data[0];
+bal = (await req('GET', `/api/inventory/balances?productId=${P}`, null, wh)).data.data[0];
 check('2.6 ยอดกลับมา 5 หลัง reversal', Number(bal?.qtyOnHand) === 5);
 
 // --- 2.7 stock card: ไล่ยอดสะสมต้องตรงทุกบรรทัด ---

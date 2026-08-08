@@ -258,7 +258,7 @@ export class QueryMovementsDto extends PaginationDto {
   refDocType?: string;
 }
 
-export class BalanceQueryDto {
+export class BalanceQueryDto extends PaginationDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
@@ -269,8 +269,15 @@ export class BalanceQueryDto {
   @IsUUID()
   productId?: string;
 
-  @ApiPropertyOptional({ description: 'เฉพาะตัวที่ต่ำกว่า min_stock' })
+  @ApiPropertyOptional({ description: 'ค้นจากรหัสหรือชื่อสินค้า' })
   @IsOptional()
-  @Type(() => Boolean)
-  belowMinOnly?: boolean;
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({
+    description: 'ซ่อนสินค้าที่ยอดเป็นศูนย์ (หน้างานปกติไม่อยากเห็น)',
+  })
+  @IsOptional()
+  @IsString()
+  hideZero?: string;
 }
