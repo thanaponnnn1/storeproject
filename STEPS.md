@@ -189,43 +189,43 @@
 
 ## เฟส 4 — Sales Flow (QT → SO → DO → INV → Payment)
 
-- [ ] **4.1 Document core**
+- [x] **4.1 Document core**
   `document_counters` + ออกเลขรัน (`QT-2026-08-0001`) ใน tx + FOR UPDATE, ตาราง `ALLOWED_TRANSITIONS`, base service เปลี่ยนสถานะ
   ✔ ทดสอบ: ขอเลข 100 ครั้งพร้อมกัน → ไม่มีเลขซ้ำ/เลขโดด, เปลี่ยนสถานะนอกตาราง → 422
 
-- [ ] **4.2 Quotation (QT)**
+- [x] **4.2 Quotation (QT)**
   header+lines CRUD (แก้ได้เฉพาะ DRAFT), transition DRAFT→SUBMITTED→APPROVED
   ✔ ทดสอบ: แก้ QT ที่ APPROVED แล้ว → 422
 
-- [ ] **4.3 SO จาก QT**
+- [x] **4.3 SO จาก QT**
   `POST /quotations/:id/convert` → สร้าง SO ที่ line ชี้กลับ `source_line_id` → QT เป็น CONVERTED
   ✔ ทดสอบ: SO line มี reference ถึง QT line ครบทุกบรรทัด
 
-- [ ] **4.4 Delivery Order (DO) + post stock**
+- [x] **4.4 Delivery Order (DO) + post stock**
   สร้าง DO จาก SO (เลือกบางรายการ/บางจำนวนได้) → **CONFIRM = post ISSUE ลง ledger + อัปเดต `qty_delivered` บน SO line ใน tx เดียว** — สินค้า SERIAL ต้องเลือก serial ครบตามจำนวน, สินค้า LOT ต้องระบุ lot (ระบบแนะนำ FEFO) ก่อน confirm ได้
   ✔ ทดสอบ: confirm DO แล้ว stock card มีรายการอ้าง DO เลขที่ถูกต้อง, ของไม่พอ → confirm ไม่ผ่านทั้งใบ, DO แอร์ 2 เครื่องแต่เลือก serial ตัวเดียว → 422
 
-- [ ] **4.5 Partial delivery**
+- [x] **4.5 Partial delivery**
   SO 100 ชิ้น → DO ใบแรก 60 → SO เป็น PARTIALLY_DELIVERED → DO ใบสอง 40 → DELIVERED
   ✔ ทดสอบ: ส่งเกินยอดค้าง (DO ใบสอง 50) → 422
 
-- [ ] **4.6 ยกเลิก DO = reversal**
+- [x] **4.6 ยกเลิก DO = reversal**
   cancel DO ที่ confirm แล้ว → สร้าง reversal movement + คืน `qty_delivered`
   ✔ ทดสอบ: ยอดสต๊อกและยอดค้างส่งกลับมาถูกต้อง
 
-- [ ] **4.7 ราคาอัตโนมัติตาม price level**
+- [x] **4.7 ราคาอัตโนมัติตาม price level**
   ตอนสร้าง QT/SO ระบบดึงราคาตาม price_level ของลูกค้า (ปลีก/ช่าง/โครงการ) และตามหน่วยที่ขาย — แก้ราคาหน้าบิลได้เฉพาะ role ที่มีสิทธิ์ + บันทึก audit
   ✔ ทดสอบ: ลูกค้าช่างเปิด SO → ได้ราคาช่างอัตโนมัติ, user ธรรมดาแก้ราคา → 403
 
-- [ ] **4.8 Invoice (INV)**
+- [x] **4.8 Invoice (INV)**
   สร้างจาก DO (หรือหลาย DO ของ SO เดียวกัน) → ISSUED → track `amount_paid`
   ✔ ทดสอบ: ยอดเงินใน INV ตรงกับ DO ต้นทาง
 
-- [ ] **4.9 Payment + ตัดหลายใบ**
+- [x] **4.9 Payment + ตัดหลายใบ**
   `payments` + `payment_allocations` — เงิน 1 ก้อนตัดหลาย INV, INV ครบ → PAID
   ✔ ทดสอบ: จ่าย 5,000 ตัด INV 3,000 + 2,000 → ทั้งสองใบเป็น PAID, จ่ายเกินหนี้ → 422
 
-- [ ] **4.10 e2e เดินเอกสารครบสาย**
+- [x] **4.10 e2e เดินเอกสารครบสาย**
   QT → approve → SO → DO(partial 2 ใบ, มีทั้งสินค้า SERIAL และ LOT) → INV → Payment จบใน test เดียว
   ✔ ทดสอบ: จบแล้ว status ทุกใบถูก + stock ถูก + serial เป็น SOLD + ลูกหนี้เป็น 0
 
@@ -235,19 +235,19 @@
 
 ## เฟส 5 — Purchase Flow (PO → GR)
 
-- [ ] **5.1 Purchase Order**
+- [x] **5.1 Purchase Order**
   header+lines + DRAFT→APPROVED + track `qty_received`
   ✔ ทดสอบ: CRUD + transition ถูกต้อง
 
-- [ ] **5.2 Goods Receipt + post stock + cost layer**
+- [x] **5.2 Goods Receipt + post stock + cost layer**
   สร้าง GR จาก PO → **CONFIRM = post RECEIVE + สร้าง cost layer (FIFO) / คำนวณ avg ใหม่ ใน tx เดียว** — สินค้า SERIAL คีย์/ยิง serial ทุกเครื่องตอนรับ, สินค้า LOT ระบุ lot_no + วันหมดอายุ
   ✔ ทดสอบ: รับของแล้วทุนไหลเข้าถูกวิธีตาม costing_method, รับแอร์โดยไม่คีย์ serial → 422
 
-- [ ] **5.3 Partial receive + ยกเลิก GR**
+- [x] **5.3 Partial receive + ยกเลิก GR**
   รับบางส่วน + cancel GR → reversal + คืน layer
   ✔ ทดสอบ: เหมือนเคสฝั่งขายแต่ทิศทางกลับ
 
-- [ ] **5.4 e2e ซื้อจนขาย**
+- [x] **5.4 e2e ซื้อจนขาย**
   PO → GR (ทุนเข้า) → SO → DO (ทุนออกแบบ FIFO) → กำไรขั้นต้นต่อรายการคำนวณได้
   ✔ ทดสอบ: ตัวเลขกำไรตรงกับที่คำนวณมือ
 
@@ -257,15 +257,15 @@
 
 ## เฟส 6 — Hardening + รายงาน
 
-- [ ] **6.1 Audit log** — ตาราง log การ approve/cancel/post ทุกครั้ง (ใคร ทำอะไร เมื่อไหร่)
-- [ ] **6.2 รายงาน** — มูลค่าสต๊อกรวม ณ วันที่, ยอดขายรายเดือน, ลูกหนี้ค้างชำระตาม credit term, สินค้าใกล้ min_stock
-- [ ] **6.3 Review สิทธิ์ทุก endpoint** — ไล่ตารางว่า role ไหนทำอะไรได้ ตรงตามที่ตั้งใจ
-- [ ] **6.4 Load test เบา ๆ** — ยิงรับ/จ่ายพร้อมกัน 50 concurrent ดูว่าไม่มี deadlock/ยอดเพี้ยน แล้วรัน reconcile ต้องสะอาด
-- [ ] **6.5 Cron jobs** (`@nestjs/schedule` — ไม่ต้องมี infra เพิ่ม)
+- [x] **6.1 Audit log** — ตาราง log การ approve/cancel/post ทุกครั้ง (ใคร ทำอะไร เมื่อไหร่)
+- [x] **6.2 รายงาน** — มูลค่าสต๊อกรวม ณ วันที่, ยอดขายรายเดือน, ลูกหนี้ค้างชำระตาม credit term, สินค้าใกล้ min_stock
+- [x] **6.3 Review สิทธิ์ทุก endpoint** — ไล่ตารางว่า role ไหนทำอะไรได้ ตรงตามที่ตั้งใจ
+- [x] **6.4 Load test เบา ๆ** — ยิงรับ/จ่ายพร้อมกัน 50 concurrent ดูว่าไม่มี deadlock/ยอดเพี้ยน แล้วรัน reconcile ต้องสะอาด
+- [x] **6.5 Cron jobs** (`@nestjs/schedule` — ไม่ต้องมี infra เพิ่ม)
   - 02:00 ทุกคืน: reconcile balance vs SUM(movements) → ผิดปกติแจ้งทันที
   - ทุกวัน: QT เกินวันหมดอายุ → EXPIRED, แจ้งสินค้าต่ำกว่า min_stock, **แจ้ง lot ปูน/สีที่จะหมดอายุใน 30 วัน**, แจ้งประกันลูกค้าที่กำลังจะหมด (โอกาสขายซ้ำ), ล้าง refresh token หมดอายุ
   ✔ ทดสอบ: ตั้งเวลา cron ให้ยิงในอีก 1 นาทีแล้วดู log ว่าทำงานครบ
-- [ ] **6.6 รูปสินค้าผ่าน Cloudinary**
+- [x] **6.6 รูปสินค้าผ่าน Cloudinary**
   เพิ่ม `products.image_public_id` + endpoint `POST /uploads/signature` (backend เซ็น signed upload ให้ — API secret ไม่หลุดไป frontend, รูปอัปโหลดตรงไป Cloudinary ไม่วิ่งผ่าน NestJS)
   ✔ ทดสอบ: ขอ signature → upload ผ่าน → เซฟ public_id → ดึง URL แบบ thumbnail transform ได้
 

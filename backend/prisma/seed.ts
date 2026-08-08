@@ -71,20 +71,26 @@ async function main(): Promise<void> {
     },
   });
 
-  // user ฝ่ายคลังสำหรับ dev/ทดสอบสิทธิ์ (รหัสเดียวกับ admin — dev เท่านั้น)
-  const warehouseRole = await prisma.role.findUniqueOrThrow({
-    where: { name: 'WAREHOUSE' },
-  });
-  await prisma.user.upsert({
-    where: { email: 'warehouse@store.local' },
-    update: {},
-    create: {
-      email: 'warehouse@store.local',
-      name: 'Warehouse Staff',
-      passwordHash: await argon2.hash(password, { type: argon2.argon2id }),
-      roleId: warehouseRole.id,
-    },
-  });
+  // user แต่ละหน้าที่สำหรับ dev/ทดสอบสิทธิ์ (รหัสเดียวกับ admin — dev เท่านั้น)
+  for (const staff of [
+    { email: 'warehouse@store.local', name: 'Warehouse Staff', role: 'WAREHOUSE' },
+    { email: 'sales@store.local', name: 'Sales Staff', role: 'SALES' },
+    { email: 'manager@store.local', name: 'Store Manager', role: 'MANAGER' },
+  ]) {
+    const role = await prisma.role.findUniqueOrThrow({
+      where: { name: staff.role },
+    });
+    await prisma.user.upsert({
+      where: { email: staff.email },
+      update: {},
+      create: {
+        email: staff.email,
+        name: staff.name,
+        passwordHash: await argon2.hash(password, { type: argon2.argon2id }),
+        roleId: role.id,
+      },
+    });
+  }
 
   await seedMasterData();
 

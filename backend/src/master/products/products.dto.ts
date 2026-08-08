@@ -113,6 +113,14 @@ export class CreateProductDto {
   minStock?: number;
 
   @ApiPropertyOptional({
+    description: 'public_id ของรูปบน Cloudinary (ได้จากการอัปโหลดตรงที่ Cloudinary)',
+    example: 'products/abc123',
+  })
+  @IsOptional()
+  @IsString()
+  imagePublicId?: string;
+
+  @ApiPropertyOptional({
     type: [CreateProductUnitDto],
     description: 'หน่วยขายเพิ่มเติมนอกจากหน่วยฐาน',
   })

@@ -10,6 +10,17 @@ const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
   CORS_ORIGINS: z.string().default('http://localhost:3001'),
+
+  // Cloudinary — ไม่ใส่ก็รันได้ แต่ฟีเจอร์อัปโหลดรูปจะปิดอยู่
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+
+  // ปิด cron ได้เวลารันหลาย instance หรือตอนเทส
+  CRON_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

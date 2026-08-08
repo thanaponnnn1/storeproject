@@ -116,8 +116,16 @@ export class InventoryService {
   }
 
   // ---------- รับเข้า ----------
+  /**
+   * เอกสาร (ใบรับของ/ใบส่งของ) เรียก *InTx เพื่อให้การ post stock
+   * อยู่ใน transaction เดียวกับการเปลี่ยนสถานะเอกสาร — พังข้อไหน rollback ทั้งหมด
+   */
   async receive(dto: ReceiveStockDto, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction((tx) => this.receiveInTx(tx, dto, userId));
+  }
+
+  async receiveInTx(tx: Tx, dto: ReceiveStockDto, userId: string) {
+    return (async () => {
       const product = await this.assertProductActive(tx, dto.productId);
       const balance = await this.lockBalance(
         tx,
@@ -171,12 +179,16 @@ export class InventoryService {
       );
 
       return movement;
-    });
+    })();
   }
 
   // ---------- จ่ายออก (กันติดลบ) ----------
   async issue(dto: IssueStockDto, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction((tx) => this.issueInTx(tx, dto, userId));
+  }
+
+  async issueInTx(tx: Tx, dto: IssueStockDto, userId: string) {
+    return (async () => {
       const product = await this.assertProductActive(tx, dto.productId);
       const balance = await this.lockBalance(
         tx,
@@ -234,7 +246,7 @@ export class InventoryService {
         movement.createdAt,
       );
       return movement;
-    });
+    })();
   }
 
   // ---------- ปรับยอดจากการนับจริง ----------
@@ -343,7 +355,11 @@ export class InventoryService {
 
   // ---------- กลับรายการ (ไม่ลบของเดิม) ----------
   async reverse(movementId: string, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction((tx) => this.reverseInTx(tx, movementId, userId));
+  }
+
+  async reverseInTx(tx: Tx, movementId: string, userId: string) {
+    return (async () => {
       const original = await tx.stockMovement.findUnique({
         where: { id: movementId },
         include: { reversedBy: true },
@@ -405,7 +421,7 @@ export class InventoryService {
         );
       }
       return movement;
-    });
+    })();
   }
 
   // ---------- Stock card ----------

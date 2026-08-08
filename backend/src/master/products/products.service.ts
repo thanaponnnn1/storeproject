@@ -8,6 +8,7 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { rethrowPrismaError } from '../../common/prisma-error';
 import { InventoryService } from '../../inventory/inventory.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UploadsService } from '../../uploads/uploads.service';
 import {
   ConvertQtyDto,
   CreateBarcodeDto,
@@ -29,6 +30,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async findAll(query: QueryProductsDto) {
@@ -66,7 +68,10 @@ export class ProductsService {
       include: productInclude,
     });
     if (!product) throw new NotFoundException('ไม่พบสินค้า');
-    return product;
+    return {
+      ...product,
+      imageUrl: this.uploads.imageUrl(product.imagePublicId),
+    };
   }
 
   async create(dto: CreateProductDto) {

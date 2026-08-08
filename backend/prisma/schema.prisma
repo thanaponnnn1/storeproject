@@ -108,6 +108,10 @@ model Warehouse {
   balances  StockBalance[]
   costLayers CostLayer[]
   serialNumbers SerialNumber[]
+  salesOrders SalesOrder[]
+  deliveryOrders DeliveryOrder[]
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts GoodsReceipt[]
 
   @@map("warehouses")
 }
@@ -129,6 +133,8 @@ model Product {
   priceContractor Decimal          @default(0) @map("price_contractor") @db.Decimal(18, 2)
   priceProject    Decimal          @default(0) @map("price_project") @db.Decimal(18, 2)
   minStock        Decimal          @default(0) @map("min_stock") @db.Decimal(18, 3)
+  /// public_id ของรูปบน Cloudinary — ไฟล์จริงไม่ผ่านเซิร์ฟเวอร์เรา
+  imagePublicId   String?          @map("image_public_id")
   isActive        Boolean          @default(true) @map("is_active")
   units           ProductUnit[]
   barcodes        ProductBarcode[]
@@ -137,6 +143,12 @@ model Product {
   costLayers      CostLayer[]
   serialNumbers   SerialNumber[]
   lots            Lot[]
+  quotationLines  QuotationLine[]
+  soLines         SalesOrderLine[]
+  deliveryLines   DeliveryOrderLine[]
+  invoiceLines    InvoiceLine[]
+  poLines         PurchaseOrderLine[]
+  grLines         GoodsReceiptLine[]
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -156,6 +168,12 @@ model ProductUnit {
   salePrice        Decimal?         @map("sale_price") @db.Decimal(18, 2)
   isActive         Boolean          @default(true) @map("is_active")
   barcodes         ProductBarcode[]
+  quotationLines   QuotationLine[]
+  soLines          SalesOrderLine[]
+  deliveryLines    DeliveryOrderLine[]
+  invoiceLines     InvoiceLine[]
+  poLines          PurchaseOrderLine[]
+  grLines          GoodsReceiptLine[]
 
   @@unique([productId, uomId])
   @@map("product_units")
@@ -186,6 +204,13 @@ model Partner {
   priceLevel     PriceLevel  @default(RETAIL) @map("price_level")
   isActive       Boolean     @default(true) @map("is_active")
   serialsSold    SerialNumber[]
+  quotations     Quotation[]
+  salesOrders    SalesOrder[]
+  deliveryOrders DeliveryOrder[]
+  invoices       Invoice[]
+  payments       Payment[]
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts  GoodsReceipt[]
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
@@ -289,6 +314,7 @@ model Lot {
   note       String?
   movements  StockMovement[]
   costLayers CostLayer[]
+  deliveryLines DeliveryOrderLine[]
   createdAt  DateTime        @default(now()) @map("created_at")
 
   // ยอดคงเหลือราย lot ไม่เก็บ cache — คำนวณจาก SUM(movements) ตามหลัก ledger
@@ -356,6 +382,447 @@ model StockBalance {
 
   @@id([productId, warehouseId])
   @@map("stock_balances")
+}
+
+// ---------- เอกสารซื้อ-ขาย (document flow + state machine) ----------
+
+// เลขรันเอกสารแยกตามประเภท+งวด: QT-2026-08-0001
+model DocumentCounter {
+  docType String @map("doc_type")
+  period  String // YYYY-MM
+  lastNo  Int    @default(0) @map("last_no")
+
+  @@id([docType, period])
+  @@map("document_counters")
+}
+
+enum QuotationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_DELIVERED
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CHEQUE
+  CREDIT_CARD
+}
+
+model Quotation {
+  id          String          @id @default(uuid())
+  docNo       String          @unique @map("doc_no")
+  status      QuotationStatus @default(DRAFT)
+  partner     Partner         @relation(fields: [partnerId], references: [id])
+  partnerId   String          @map("partner_id")
+  docDate     DateTime        @default(now()) @map("doc_date")
+  validUntil  DateTime?       @map("valid_until")
+  remark      String?
+  vatRate     Decimal         @default(7) @map("vat_rate") @db.Decimal(5, 2)
+  subtotal    Decimal         @default(0) @db.Decimal(18, 2)
+  vatAmount   Decimal         @default(0) @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount Decimal         @default(0) @map("total_amount") @db.Decimal(18, 2)
+  lines       QuotationLine[]
+  salesOrders SalesOrder[]
+  createdBy   String          @map("created_by")
+  approvedBy  String?         @map("approved_by")
+  approvedAt  DateTime?       @map("approved_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([partnerId, docDate])
+  @@index([status])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id            String          @id @default(uuid())
+  quotation     Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  quotationId   String          @map("quotation_id")
+  lineNo        Int             @map("line_no")
+  product       Product         @relation(fields: [productId], references: [id])
+  productId     String          @map("product_id")
+  // หน่วยที่ขาย (null = หน่วยฐาน) — ขายเป็นมัด/ม้วนได้
+  productUnit   ProductUnit?    @relation(fields: [productUnitId], references: [id])
+  productUnitId String?         @map("product_unit_id")
+  qty           Decimal         @db.Decimal(18, 3)
+  /// จำนวนในหน่วยฐาน = qty × conversion_factor (ใช้ตัดสต๊อก)
+  baseQty       Decimal         @map("base_qty") @db.Decimal(18, 3)
+  unitPrice     Decimal         @map("unit_price") @db.Decimal(18, 2)
+  discount      Decimal         @default(0) @db.Decimal(18, 2)
+  lineTotal     Decimal         @map("line_total") @db.Decimal(18, 2)
+  soLines       SalesOrderLine[]
+
+  @@map("quotation_lines")
+}
+
+model SalesOrder {
+  id           String           @id @default(uuid())
+  docNo        String           @unique @map("doc_no")
+  status       SalesOrderStatus @default(DRAFT)
+  partner      Partner          @relation(fields: [partnerId], references: [id])
+  partnerId    String           @map("partner_id")
+  quotation    Quotation?       @relation(fields: [quotationId], references: [id])
+  quotationId  String?          @map("quotation_id")
+  warehouse    Warehouse        @relation(fields: [warehouseId], references: [id])
+  warehouseId  String           @map("warehouse_id")
+  docDate      DateTime         @default(now()) @map("doc_date")
+  deliveryDate DateTime?        @map("delivery_date")
+  remark       String?
+  vatRate      Decimal          @default(7) @map("vat_rate") @db.Decimal(5, 2)
+  subtotal     Decimal          @default(0) @db.Decimal(18, 2)
+  vatAmount    Decimal          @default(0) @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount  Decimal          @default(0) @map("total_amount") @db.Decimal(18, 2)
+  lines        SalesOrderLine[]
+  deliveries   DeliveryOrder[]
+  invoices     Invoice[]
+  createdBy    String           @map("created_by")
+  confirmedBy  String?          @map("confirmed_by")
+  confirmedAt  DateTime?        @map("confirmed_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@index([partnerId, docDate])
+  @@index([status])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id            String              @id @default(uuid())
+  salesOrder    SalesOrder          @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  salesOrderId  String              @map("sales_order_id")
+  lineNo        Int                 @map("line_no")
+  product       Product             @relation(fields: [productId], references: [id])
+  productId     String              @map("product_id")
+  productUnit   ProductUnit?        @relation(fields: [productUnitId], references: [id])
+  productUnitId String?             @map("product_unit_id")
+  qty           Decimal             @db.Decimal(18, 3)
+  baseQty       Decimal             @map("base_qty") @db.Decimal(18, 3)
+  unitPrice     Decimal             @map("unit_price") @db.Decimal(18, 2)
+  discount      Decimal             @default(0) @db.Decimal(18, 2)
+  lineTotal     Decimal             @map("line_total") @db.Decimal(18, 2)
+  /// ยอดสะสมที่ส่งของแล้ว/วางบิลแล้ว (หน่วยฐาน) — ใช้คุมการส่งบางส่วน
+  qtyDelivered  Decimal             @default(0) @map("qty_delivered") @db.Decimal(18, 3)
+  qtyInvoiced   Decimal             @default(0) @map("qty_invoiced") @db.Decimal(18, 3)
+  /// ลูกโซ่เอกสาร: ชี้กลับไปที่บรรทัดของใบเสนอราคาต้นทาง
+  sourceLine    QuotationLine?      @relation(fields: [sourceLineId], references: [id])
+  sourceLineId  String?             @map("source_line_id")
+  deliveryLines DeliveryOrderLine[]
+  invoiceLines  InvoiceLine[]
+
+  @@map("sales_order_lines")
+}
+
+model DeliveryOrder {
+  id           String              @id @default(uuid())
+  docNo        String              @unique @map("doc_no")
+  status       DeliveryStatus      @default(DRAFT)
+  partner      Partner             @relation(fields: [partnerId], references: [id])
+  partnerId    String              @map("partner_id")
+  salesOrder   SalesOrder          @relation(fields: [salesOrderId], references: [id])
+  salesOrderId String              @map("sales_order_id")
+  warehouse    Warehouse           @relation(fields: [warehouseId], references: [id])
+  warehouseId  String              @map("warehouse_id")
+  docDate      DateTime            @default(now()) @map("doc_date")
+  remark       String?
+  lines        DeliveryOrderLine[]
+  invoiceLines InvoiceLine[]
+  createdBy    String              @map("created_by")
+  confirmedBy  String?             @map("confirmed_by")
+  confirmedAt  DateTime?           @map("confirmed_at")
+  cancelledBy  String?             @map("cancelled_by")
+  cancelledAt  DateTime?           @map("cancelled_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  @@index([salesOrderId])
+  @@index([status])
+  @@map("delivery_orders")
+}
+
+model DeliveryOrderLine {
+  id              String         @id @default(uuid())
+  deliveryOrder   DeliveryOrder  @relation(fields: [deliveryOrderId], references: [id], onDelete: Cascade)
+  deliveryOrderId String         @map("delivery_order_id")
+  lineNo          Int            @map("line_no")
+  product         Product        @relation(fields: [productId], references: [id])
+  productId       String         @map("product_id")
+  productUnit     ProductUnit?   @relation(fields: [productUnitId], references: [id])
+  productUnitId   String?        @map("product_unit_id")
+  qty             Decimal        @db.Decimal(18, 3)
+  baseQty         Decimal        @map("base_qty") @db.Decimal(18, 3)
+  unitPrice       Decimal        @map("unit_price") @db.Decimal(18, 2)
+  discount        Decimal        @default(0) @db.Decimal(18, 2)
+  lineTotal       Decimal        @map("line_total") @db.Decimal(18, 2)
+  /// สินค้า SERIAL: เครื่องที่จะส่ง / สินค้า LOT: ล็อตที่จะจ่าย
+  serials         String[]
+  lot             Lot?           @relation(fields: [lotId], references: [id])
+  lotId           String?        @map("lot_id")
+  /// movement ที่เกิดตอน confirm — ใช้กลับรายการตอนยกเลิกใบส่งของ
+  movementId      String?        @map("movement_id")
+  sourceLine      SalesOrderLine @relation(fields: [sourceLineId], references: [id])
+  sourceLineId    String         @map("source_line_id")
+  invoiceLines    InvoiceLine[]
+
+  @@map("delivery_order_lines")
+}
+
+model Invoice {
+  id           String        @id @default(uuid())
+  docNo        String        @unique @map("doc_no")
+  status       InvoiceStatus @default(DRAFT)
+  partner      Partner       @relation(fields: [partnerId], references: [id])
+  partnerId    String        @map("partner_id")
+  salesOrder   SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  salesOrderId String?       @map("sales_order_id")
+  docDate      DateTime      @default(now()) @map("doc_date")
+  dueDate      DateTime      @map("due_date")
+  remark       String?
+  vatRate      Decimal       @default(7) @map("vat_rate") @db.Decimal(5, 2)
+  subtotal     Decimal       @default(0) @db.Decimal(18, 2)
+  vatAmount    Decimal       @default(0) @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount  Decimal       @default(0) @map("total_amount") @db.Decimal(18, 2)
+  amountPaid   Decimal       @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  lines        InvoiceLine[]
+  allocations  PaymentAllocation[]
+  createdBy    String        @map("created_by")
+  issuedBy     String?       @map("issued_by")
+  issuedAt     DateTime?     @map("issued_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@index([partnerId, status])
+  @@index([status, dueDate])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id              String             @id @default(uuid())
+  invoice         Invoice            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId       String             @map("invoice_id")
+  lineNo          Int                @map("line_no")
+  product         Product            @relation(fields: [productId], references: [id])
+  productId       String             @map("product_id")
+  productUnit     ProductUnit?       @relation(fields: [productUnitId], references: [id])
+  productUnitId   String?            @map("product_unit_id")
+  qty             Decimal            @db.Decimal(18, 3)
+  baseQty         Decimal            @map("base_qty") @db.Decimal(18, 3)
+  unitPrice       Decimal            @map("unit_price") @db.Decimal(18, 2)
+  discount        Decimal            @default(0) @db.Decimal(18, 2)
+  lineTotal       Decimal            @map("line_total") @db.Decimal(18, 2)
+  deliveryOrder   DeliveryOrder?     @relation(fields: [deliveryOrderId], references: [id])
+  deliveryOrderId String?            @map("delivery_order_id")
+  sourceLine      DeliveryOrderLine? @relation(fields: [sourceLineId], references: [id])
+  sourceLineId    String?            @map("source_line_id")
+  soLine          SalesOrderLine?    @relation(fields: [soLineId], references: [id])
+  soLineId        String?            @map("so_line_id")
+
+  @@map("invoice_lines")
+}
+
+model Payment {
+  id          String              @id @default(uuid())
+  docNo       String              @unique @map("doc_no")
+  partner     Partner             @relation(fields: [partnerId], references: [id])
+  partnerId   String              @map("partner_id")
+  paymentDate DateTime            @default(now()) @map("payment_date")
+  method      PaymentMethod       @default(CASH)
+  amount      Decimal             @db.Decimal(18, 2)
+  reference   String?
+  remark      String?
+  allocations PaymentAllocation[]
+  createdBy   String              @map("created_by")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  @@index([partnerId, paymentDate])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id        String  @id @default(uuid())
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId String  @map("payment_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId String  @map("invoice_id")
+  amount    Decimal @db.Decimal(18, 2)
+
+  @@index([invoiceId])
+  @@map("payment_allocations")
+}
+
+// ---------- เอกสารฝั่งซื้อ (PO → GR) ----------
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  docNo        String              @unique @map("doc_no")
+  status       PurchaseOrderStatus @default(DRAFT)
+  /// ซัพพลายเออร์
+  partner      Partner             @relation(fields: [partnerId], references: [id])
+  partnerId    String              @map("partner_id")
+  warehouse    Warehouse           @relation(fields: [warehouseId], references: [id])
+  warehouseId  String              @map("warehouse_id")
+  docDate      DateTime            @default(now()) @map("doc_date")
+  expectedDate DateTime?           @map("expected_date")
+  remark       String?
+  vatRate      Decimal             @default(7) @map("vat_rate") @db.Decimal(5, 2)
+  subtotal     Decimal             @default(0) @db.Decimal(18, 2)
+  vatAmount    Decimal             @default(0) @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount  Decimal             @default(0) @map("total_amount") @db.Decimal(18, 2)
+  lines        PurchaseOrderLine[]
+  receipts     GoodsReceipt[]
+  createdBy    String              @map("created_by")
+  approvedBy   String?             @map("approved_by")
+  approvedAt   DateTime?           @map("approved_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  @@index([partnerId, docDate])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String             @id @default(uuid())
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String             @map("purchase_order_id")
+  lineNo          Int                @map("line_no")
+  product         Product            @relation(fields: [productId], references: [id])
+  productId       String             @map("product_id")
+  productUnit     ProductUnit?       @relation(fields: [productUnitId], references: [id])
+  productUnitId   String?            @map("product_unit_id")
+  qty             Decimal            @db.Decimal(18, 3)
+  baseQty         Decimal            @map("base_qty") @db.Decimal(18, 3)
+  /// ทุนต่อหน่วยที่ซื้อ (ไม่ใช่ราคาขาย)
+  unitCost        Decimal            @map("unit_cost") @db.Decimal(18, 4)
+  discount        Decimal            @default(0) @db.Decimal(18, 2)
+  lineTotal       Decimal            @map("line_total") @db.Decimal(18, 2)
+  /// ยอดรับเข้าสะสม (หน่วยฐาน) — คุมการรับบางส่วน
+  qtyReceived     Decimal            @default(0) @map("qty_received") @db.Decimal(18, 3)
+  receiptLines    GoodsReceiptLine[]
+
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id              String             @id @default(uuid())
+  docNo           String             @unique @map("doc_no")
+  status          GoodsReceiptStatus @default(DRAFT)
+  partner         Partner            @relation(fields: [partnerId], references: [id])
+  partnerId       String             @map("partner_id")
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId String             @map("purchase_order_id")
+  warehouse       Warehouse          @relation(fields: [warehouseId], references: [id])
+  warehouseId     String             @map("warehouse_id")
+  docDate         DateTime           @default(now()) @map("doc_date")
+  /// เลขที่ใบส่งของ/ใบกำกับของซัพพลายเออร์
+  supplierRef     String?            @map("supplier_ref")
+  remark          String?
+  lines           GoodsReceiptLine[]
+  createdBy       String             @map("created_by")
+  confirmedBy     String?            @map("confirmed_by")
+  confirmedAt     DateTime?          @map("confirmed_at")
+  cancelledBy     String?            @map("cancelled_by")
+  cancelledAt     DateTime?          @map("cancelled_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@index([purchaseOrderId])
+  @@index([status])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id             String            @id @default(uuid())
+  goodsReceipt   GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  goodsReceiptId String            @map("goods_receipt_id")
+  lineNo         Int               @map("line_no")
+  product        Product           @relation(fields: [productId], references: [id])
+  productId      String            @map("product_id")
+  productUnit    ProductUnit?      @relation(fields: [productUnitId], references: [id])
+  productUnitId  String?           @map("product_unit_id")
+  qty            Decimal           @db.Decimal(18, 3)
+  baseQty        Decimal           @map("base_qty") @db.Decimal(18, 3)
+  unitCost       Decimal           @map("unit_cost") @db.Decimal(18, 4)
+  lineTotal      Decimal           @map("line_total") @db.Decimal(18, 2)
+  /// สินค้า SERIAL: เครื่องที่รับเข้า / สินค้า LOT: ล็อตใหม่ที่รับ
+  serials        String[]
+  lotNo          String?           @map("lot_no")
+  expiryDate     DateTime?         @map("expiry_date")
+  /// movement ที่เกิดตอน confirm — ใช้กลับรายการตอนยกเลิกใบรับของ
+  movementId     String?           @map("movement_id")
+  sourceLine     PurchaseOrderLine @relation(fields: [sourceLineId], references: [id])
+  sourceLineId   String            @map("source_line_id")
+
+  @@map("goods_receipt_lines")
+}
+
+// ---------- Audit trail ----------
+
+/// บันทึกทุกการเปลี่ยนแปลงข้อมูล (ใคร ทำอะไร กับอะไร เมื่อไหร่ จากที่ไหน)
+/// append-only เหมือน ledger — ไม่มี endpoint แก้/ลบ
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  userEmail  String?  @map("user_email")
+  userRole   String?  @map("user_role")
+  /// เช่น quotations.approve, deliveries.confirm, inventory.adjustments
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  method     String
+  path       String
+  statusCode Int      @map("status_code")
+  /// body ที่ตัดข้อมูลอ่อนไหวออกแล้ว
+  payload    Json?
+  ip         String?
+  durationMs Int      @map("duration_ms")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
 }
 
 model RefreshToken {

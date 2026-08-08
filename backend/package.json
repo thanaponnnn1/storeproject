@@ -12,7 +12,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "verify": "node test/verify/verify-phase0.mjs && node test/verify/verify-phase1.mjs && node test/verify/verify-phase2.mjs && node test/verify/verify-phase3.mjs && node test/verify/verify-phase3.5.mjs",
+    "verify": "node test/verify/verify-phase0.mjs && node test/verify/verify-phase1.mjs && node test/verify/verify-phase2.mjs && node test/verify/verify-phase3.mjs && node test/verify/verify-phase3.5.mjs && node test/verify/verify-phase4.mjs && node test/verify/verify-phase5.mjs && node test/verify/verify-phase6.mjs",
     "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts"
@@ -26,6 +26,7 @@
     "@nestjs/core": "^11.1.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.1.0",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.7.0",
@@ -55,13 +56,19 @@
     "typescript": "^5.8.3"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
