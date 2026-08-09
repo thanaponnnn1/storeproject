@@ -4,3 +4,5 @@ out/
 .env.local
 certificates/
 *.log
+
+tsconfig.tsbuildinfo

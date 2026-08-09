@@ -1,0 +1,13 @@
+# ไฟล์ที่ระบบสร้างเอง — สร้างใหม่ได้ด้วย pnpm demo:barcodes / demo:serials
+barcodes.pdf
+barcodes-receive.pdf
+serials.pdf
+
+# ไฟล์สำรองฐานข้อมูล (อาจมีข้อมูลจริงอยู่ข้างใน)
+backups/*.sql
+
+# ของ editor / ระบบปฏิบัติการ
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
