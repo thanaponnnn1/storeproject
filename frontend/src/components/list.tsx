@@ -32,15 +32,21 @@ export function useUrlFilters() {
   return { params, setFilter };
 }
 
-/** ช่องค้นหา — หน่วงไว้ 350ms กันยิง API ทุกตัวอักษร */
+/**
+ * ช่องค้นหา — หน่วงไว้ 350ms กันยิง API ทุกตัวอักษร
+ * scannable = มีปุ่มกล้องให้ยิงบาร์โค้ดใส่ช่องค้นหาได้เลย (backend ค้นบาร์โค้ดด้วย)
+ */
 export function SearchInput({
   placeholder = 'ค้นหา…',
+  scannable = false,
 }: {
   placeholder?: string;
+  scannable?: boolean;
 }) {
   const { params, setFilter } = useUrlFilters();
   const urlValue = params.get('search') ?? '';
   const [value, setValue] = useState(urlValue);
+  const [scanOpen, setScanOpen] = useState(false);
   const first = useRef(true);
 
   // กดถอยแล้วช่องค้นหาต้องเปลี่ยนตาม URL ด้วย
@@ -57,24 +63,69 @@ export function SearchInput({
   }, [value, urlValue, setFilter]);
 
   return (
-    <div className="relative">
-      <input
-        type="search"
-        inputMode="search"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        className="tap-target w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 outline-none focus:border-slate-900"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-      >
-        🔍
-      </span>
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type="search"
+            inputMode="search"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            className="tap-target w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 outline-none focus:border-slate-900"
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          >
+            🔍
+          </span>
+        </div>
+
+        {scannable && (
+          <button
+            onClick={() => setScanOpen((v) => !v)}
+            aria-label="ยิงบาร์โค้ดเพื่อค้นหา"
+            aria-pressed={scanOpen}
+            className={`tap-target shrink-0 rounded-lg border px-4 text-lg ${
+              scanOpen
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-300 bg-white'
+            }`}
+          >
+            📷
+          </button>
+        )}
+      </div>
+
+      {scanOpen && (
+        <ScanToSearch
+          onFound={(code) => {
+            setValue(code);
+            setFilter({ search: code });
+            setScanOpen(false);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+/** โหลดตัวสแกนเฉพาะตอนกดใช้ — ไม่ให้ทุกหน้าที่มีช่องค้นหาต้องแบกโค้ดกล้องไปด้วย */
+function ScanToSearch({ onFound }: { onFound: (code: string) => void }) {
+  const [Scanner, setScanner] = useState<React.ComponentType<{
+    onScan: (code: string) => void;
+  }> | null>(null);
+
+  useEffect(() => {
+    void import('@/components/barcode-scanner').then((m) =>
+      setScanner(() => m.BarcodeScanner),
+    );
+  }, []);
+
+  if (!Scanner) return <Loading label="กำลังเปิดกล้อง…" />;
+  return <Scanner onScan={onFound} />;
 }
 
 export function FilterTabs({

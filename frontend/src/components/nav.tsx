@@ -22,6 +22,8 @@ export const PRIMARY_NAV: NavItem[] = [
 ];
 
 export const ALL_NAV: NavItem[] = [
+  { href: '/receive', label: 'รับของเข้าคลัง', icon: '📥' },
+  { href: '/issue', label: 'จ่ายของออก', icon: '📤' },
   { href: '/partners', label: 'ลูกค้า/ซัพพลายเออร์', icon: '🤝' },
   { href: '/sales', label: 'งานขาย', icon: '🧾' },
   { href: '/purchases', label: 'งานซื้อ', icon: '🚚' },

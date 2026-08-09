@@ -58,9 +58,22 @@ export function Field({
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  /**
+   * ช่องตัวเลขที่มีค่าเดิมอยู่ (เช่น 0) ถ้าไม่เลือกทั้งหมดให้ก่อน
+   * พอผู้ใช้พิมพ์ต่อจะกลายเป็น "03600" — แตะแล้วเลือกทั้งค่าไว้เลยจะพิมพ์ทับได้ทันที
+   */
+  const selectOnFocus =
+    props.type === 'number'
+      ? (e: React.FocusEvent<HTMLInputElement>) => {
+          e.target.select();
+          props.onFocus?.(e);
+        }
+      : props.onFocus;
+
   return (
     <input
       {...props}
+      onFocus={selectOnFocus}
       className={`tap-target w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 ${props.className ?? ''}`}
     />
   );

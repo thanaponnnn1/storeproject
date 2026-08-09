@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "store-backend",
   "version": "0.1.0",
   "description": "Warehouse + Trading ERP-lite backend (NestJS + Prisma + PostgreSQL)",
@@ -15,7 +15,13 @@
     "verify": "node test/verify/verify-phase0.mjs && node test/verify/verify-phase1.mjs && node test/verify/verify-phase2.mjs && node test/verify/verify-phase3.mjs && node test/verify/verify-phase3.5.mjs && node test/verify/verify-phase4.mjs && node test/verify/verify-phase5.mjs && node test/verify/verify-phase6.mjs",
     "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "demo:products": "node scripts/demo-products.mjs",
+    "demo:barcodes": "node scripts/barcode-pdf.mjs && node scripts/verify-barcodes.mjs",
+    "demo:serials": "node scripts/serial-labels.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:cleanup": "node scripts/db-backup.mjs && docker exec -i storeproject-db psql -U store -d storedb -v ON_ERROR_STOP=1 < scripts/cleanup-test-data.sql",
+    "demo:receive": "node scripts/demo-receive.mjs && node scripts/barcode-pdf.mjs barcodes-receive.pdf --skus=scripts/demo-receive-skus.json && node scripts/verify-barcodes.mjs --skus=scripts/demo-receive-skus.json"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -45,8 +51,11 @@
     "@types/express": "^5.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.0",
+    "@types/pdfkit": "^0.17.6",
     "@types/supertest": "^6.0.3",
+    "bwip-js": "^4.11.2",
     "jest": "^29.7.0",
+    "pdfkit": "^0.19.1",
     "prisma": "^6.7.0",
     "supertest": "^7.1.0",
     "ts-jest": "^29.3.0",

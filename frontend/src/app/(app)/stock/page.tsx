@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useState } from 'react';
@@ -192,7 +192,7 @@ function StockPage() {
 
       <div className="flex gap-2">
         <div className="flex-1">
-          <SearchInput placeholder="ค้นหา รหัส / ชื่อสินค้า" />
+          <SearchInput placeholder="ค้นหา รหัส / ชื่อสินค้า" scannable />
         </div>
         <WarehouseSelect />
       </div>

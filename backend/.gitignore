@@ -3,3 +3,9 @@ dist/
 coverage/
 .env
 *.log
+barcodes.pdf
+barcodes-receive.pdf
+serials.pdf
+
+# ไฟล์สำรองฐานข้อมูล
+../backups/

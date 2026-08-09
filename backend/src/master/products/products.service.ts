@@ -45,6 +45,15 @@ export class ProductsService {
               { name: { contains: query.search, mode: 'insensitive' } },
               { brand: { contains: query.search, mode: 'insensitive' } },
               { model: { contains: query.search, mode: 'insensitive' } },
+              // ยิงบาร์โค้ดใส่ช่องค้นหาแล้วต้องเจอด้วย — หน้างานจะได้ไม่ต้องจำว่า
+              // ช่องไหนใช้ค้นชื่อ ช่องไหนใช้ยิงบาร์โค้ด
+              {
+                barcodes: {
+                  some: {
+                    barcode: { contains: query.search, mode: 'insensitive' },
+                  },
+                },
+              },
             ],
           }
         : {}),

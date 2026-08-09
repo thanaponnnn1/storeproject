@@ -10,7 +10,7 @@
     "start": "next start -p 3001",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "verify": "node test/verify-phase7.1.mjs && node test/verify-phase7.2.mjs && node test/verify-phase7.3.mjs && node test/verify-phase7.4.mjs"
+    "verify": "node test/verify-phase7.1.mjs && node test/verify-phase7.2.mjs && node test/verify-phase7.3.mjs && node test/verify-phase7.4.mjs && node test/verify-phase7.5.mjs && node test/verify-phase7.6.mjs && node test/verify-scan-search.mjs"
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",

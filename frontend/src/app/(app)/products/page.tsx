@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -50,7 +50,7 @@ function ProductList() {
         )}
       </div>
 
-      <SearchInput placeholder="ค้นหา รหัส / ชื่อ / ยี่ห้อ / รุ่น" />
+      <SearchInput placeholder="ค้นหา รหัส / ชื่อ / ยี่ห้อ / บาร์โค้ด" scannable />
 
       <FilterTabs
         name="trackingType"

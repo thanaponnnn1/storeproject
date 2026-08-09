@@ -5,21 +5,26 @@ import { useUser } from '@/components/user-context';
 
 const SHORTCUTS = [
   {
+    href: '/receive',
+    icon: '📥',
+    label: 'รับของเข้าคลัง',
+    hint: 'ยิงบาร์โค้ดรับของ',
+  },
+  {
+    href: '/issue',
+    icon: '📤',
+    label: 'จ่ายของออก',
+    hint: 'ยิงบาร์โค้ดจ่ายของ',
+  },
+  {
     href: '/scan',
     icon: '📷',
-    label: 'สแกนบาร์โค้ด',
-    hint: 'ยิงหาสินค้า เช็คของ',
+    label: 'สแกนเช็คของ',
+    hint: 'ดูยอด/เช็คประกัน',
   },
   { href: '/stock', icon: '📦', label: 'ยอดคงเหลือ', hint: 'ดูของในคลัง' },
   { href: '/products', icon: '🏷️', label: 'สินค้า', hint: 'ค้นหา/แก้ไขสินค้า' },
-  {
-    href: '/partners',
-    icon: '🤝',
-    label: 'ลูกค้า/ซัพพลายเออร์',
-    hint: 'ข้อมูลคู่ค้า',
-  },
   { href: '/sales', icon: '🧾', label: 'งานขาย', hint: 'ใบเสนอราคา → เก็บเงิน' },
-  { href: '/purchases', icon: '🚚', label: 'งานซื้อ', hint: 'สั่งซื้อ → รับของ' },
 ];
 
 export default function HomePage() {
